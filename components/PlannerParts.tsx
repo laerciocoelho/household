@@ -97,14 +97,15 @@ interface DayCellProps {
   onCreate: (iso: string) => void;
 }
 
-/** Célula de dia: só o título das tarefas (chips coloridos, arrastáveis) e contador. */
+/** Célula de dia: chips coloridos e contador de tarefas concluídas/total. */
 export function DayCell({
   day, label, items, isSelected, isToday, dimmed, maxChips = 3, className, dnd, onSelect, onCreate,
 }: DayCellProps) {
   const { memberById, isLockedByOther } = useHousehold();
   const iso = toISODate(day);
   const sorted = sortTasks(items);
-  const pending = sorted.filter((t) => t.status !== 'completed').length;
+  // Ponto 2: Lógica corrigida para tarefas concluídas de tarefas existentes (1/3)
+  const completed = sorted.filter((t) => t.status === 'completed').length;
   const colorOf = (t: Task) => memberById(t.assigned_to)?.color_hex ?? BOTH_COLOR;
 
   return (
@@ -131,7 +132,7 @@ export function DayCell({
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium capitalize">{label}</span>
         {items.length > 0 && (
-          <span className="rounded-full bg-slate-200 px-1.5 text-[10px]">{pending}/{items.length}</span>
+          <span className="rounded-full bg-slate-200 px-1.5 text-[10px]">{completed}/{items.length}</span>
         )}
       </div>
 

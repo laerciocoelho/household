@@ -10,7 +10,8 @@ import { useTaskActions } from '@/components/TaskActionsProvider';
 import { AssignTargets, DayCell, DayTasks, PeriodNav, usePlannerDnD } from '@/components/PlannerParts';
 import { groupByDay, toISODate } from '@/lib/utils';
 
-const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+// Ponto 6: Semana iniciando no domingo
+const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function MonthlyView() {
   const { tasks } = useRealtimeTasks();
@@ -19,9 +20,10 @@ export function MonthlyView() {
   const [cursor, setCursor] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
 
+  // Ponto 6: weekStartsOn: 0 para o calendário mensal
   const days = useMemo(() => eachDayOfInterval({
-    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }),
+    start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 }),
   }), [cursor]);
 
   const byDay = useMemo(() => groupByDay(tasks), [tasks]);

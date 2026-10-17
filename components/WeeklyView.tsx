@@ -14,8 +14,9 @@ export function WeeklyView() {
   const dnd = usePlannerDnD(tasks);
   const [selected, setSelected] = useState(new Date());
 
-  const weekStart = startOfWeek(selected, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(selected, { weekStartsOn: 1 });
+  // Ponto 6: Semana iniciando no domingo (weekStartsOn: 0)
+  const weekStart = startOfWeek(selected, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(selected, { weekStartsOn: 0 });
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const byDay = useMemo(() => groupByDay(tasks), [tasks]);
 

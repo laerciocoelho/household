@@ -1,11 +1,12 @@
 'use client';
 
-import { AlarmClock, Check, Clock, Flag, Lock, Pencil, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
+import { AlarmClock, Calendar, Check, Clock, Flag, Lock, Pencil, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useTaskActions } from '@/components/TaskActionsProvider';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { BOTH_COLOR, RECURRENCE_LABEL, SHIFT_LABEL } from '@/lib/constants';
 import { cn, formatTime, isOverdue } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
 import type { Task } from '@/types/database';
 
 interface Props {
@@ -30,6 +31,11 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
   const done = task.status === 'completed';
   const overdue = isOverdue(task.due_date, task.status);
   const disabled = lockedByOther || pendingApproval;
+
+  // Data de atribuição formatada
+  const formattedDueDate = task.due_date
+    ? format(parseISO(task.due_date), 'dd/MM/yyyy')
+    : null;
 
   return (
     <div
@@ -68,9 +74,16 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className={cn('text-sm font-medium leading-snug', done && 'line-through text-slate-500')}>
-          {task.title}
-        </p>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <p className={cn('text-sm font-medium leading-snug', done && 'line-through text-slate-500')}>
+            {task.title}
+          </p>
+          {formattedDueDate && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-normal">
+              <Calendar className="h-3 w-3" /> {formattedDueDate}
+            </span>
+          )}
+        </div>
 
         {!compact && task.description && (
           <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{task.description}</p>

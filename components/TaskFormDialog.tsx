@@ -52,7 +52,6 @@ const toInput = (f: FormState): TaskInput => ({
   requires_approval: f.requires_approval,
 });
 
-/** Somente os campos que realmente mudaram. */
 function diffPatch(task: Task, f: FormState): Partial<TaskInput> {
   const next = toInput(f);
   const prev: TaskInput = {
@@ -67,6 +66,27 @@ function diffPatch(task: Task, f: FormState): Partial<TaskInput> {
   return patch as Partial<TaskInput>;
 }
 
+// Helpers para faixas de horário por turno
+function getShiftLimits(shift: PeriodShift) {
+  switch (shift) {
+    case 'morning':
+      return { min: '00:00', max: '11:55' };
+    case 'afternoon':
+      return { min: '12:00', max: '17:55' };
+    case 'night':
+      return { min: '18:00', max: '23:55' };
+    default:
+      return { min: undefined, max: undefined };
+  }
+}
+
+function getShiftFromTime(time: string): PeriodShift {
+  if (!time) return 'anytime';
+  if (time >= '00:00' && time <= '11:59') return 'morning';
+  if (time >= '12:00' && time <= '17:59') return 'afternoon';
+  return 'night';
+}
+
 export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
   const { members, acquireLock, releaseLock } = useHousehold();
   const { notify } = useTaskActions();
@@ -76,7 +96,6 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Ao abrir em modo edição: adquire o lock (broadcast TASK_LOCK + heartbeat).
   useEffect(() => {
     if (!open) return;
     setError(null);
@@ -93,6 +112,31 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
   const needsApproval = !!task?.requires_approval;
+
+  // Ponto 4: Ao mudar turno, se o horário atual não couber no limite, limpa o horário
+  const handleShiftChange = (shift: PeriodShift) => {
+    const limits = getShiftLimits(shift);
+    let nextTime = form.due_time;
+    if (shift !== 'anytime' && form.due_time) {
+      if (limits.min && form.due_time < limits.min) nextTime = '';
+      if (limits.max && form.due_time > limits.max) nextTime = '';
+    }
+    setForm((f) => ({ ...f, period_shift: shift, due_time: nextTime }));
+  };
+
+  // Ponto 5: Ao alterar horário, sincroniza o turno correspondente
+  const handleTimeChange = (time: string) => {
+    if (!time) {
+      set('due_time', '');
+      return;
+    }
+    const detectedShift = getShiftFromTime(time);
+    setForm((f) => ({
+      ...f,
+      due_time: time,
+      period_shift: detectedShift,
+    }));
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +164,7 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
 
   const input = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none';
   const label = 'mb-1 block text-xs font-medium text-slate-600';
+  const timeLimits = getShiftLimits(form.period_shift);
 
   return (
     <Modal open={open} onClose={onClose} title={task ? 'Editar tarefa' : 'Nova tarefa'}>
@@ -152,7 +197,7 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
           <div>
             <label className={label}>Turno</label>
             <select className={input} value={form.period_shift}
-                    onChange={(e) => set('period_shift', e.target.value as PeriodShift)}>
+                    onChange={(e) => handleShiftChange(e.target.value as PeriodShift)}>
               {SHIFTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
@@ -160,7 +205,8 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
             <label className={label}>Horário (opcional)</label>
             <div className="flex gap-1">
               <input type="time" className={input} value={form.due_time}
-                     onChange={(e) => set('due_time', e.target.value)} />
+                     min={timeLimits.min} max={timeLimits.max}
+                     onChange={(e) => handleTimeChange(e.target.value)} />
               {form.due_time && (
                 <button type="button" onClick={() => set('due_time', '')}
                         className="rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100" aria-label="Remover horário">
