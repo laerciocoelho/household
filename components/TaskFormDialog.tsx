@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Lock, ShieldCheck } from 'lucide-react';
 import { Modal } from '@/components/Modal';
 import { useTaskActions } from '@/components/TaskActionsProvider';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
-import { PRIORITY_LABEL, RECURRENCE_LABEL, SHIFTS } from '@/lib/constants';
+import {
+  PRIORITY_LABEL, RECURRENCE_LABEL, SHIFTS, SHIFT_TIME_RANGE, SHIFT_LABEL, shiftForTime, timeMatchesShift, timesForShift,
+} from '@/lib/constants';
 import { toISODate } from '@/lib/utils';
 import type { PeriodShift, RecurrenceRule, Task, TaskInput, TaskPriority } from '@/types/database';
 
@@ -27,17 +29,20 @@ interface FormState {
   recurrence_rule: RecurrenceRule;
   priority: TaskPriority;
   requires_approval: boolean;
+  is_personal: boolean;
 }
 
 const emptyForm = (date: string): FormState => ({
   title: '', description: '', assigned_to: null, period_shift: 'anytime',
   due_date: date, due_time: '', recurrence_rule: 'none', priority: 'normal', requires_approval: false,
+  is_personal: false,
 });
 
 const fromTask = (t: Task): FormState => ({
   title: t.title, description: t.description ?? '', assigned_to: t.assigned_to,
   period_shift: t.period_shift, due_date: t.due_date, due_time: t.due_time?.slice(0, 5) ?? '',
   recurrence_rule: t.recurrence_rule, priority: t.priority, requires_approval: t.requires_approval,
+  is_personal: t.is_personal,
 });
 
 const toInput = (f: FormState): TaskInput => ({
@@ -49,7 +54,8 @@ const toInput = (f: FormState): TaskInput => ({
   due_time: f.due_time || null,
   recurrence_rule: f.recurrence_rule,
   priority: f.priority,
-  requires_approval: f.requires_approval,
+  requires_approval: f.is_personal ? false : f.requires_approval,
+  is_personal: f.is_personal,
 });
 
 function diffPatch(task: Task, f: FormState): Partial<TaskInput> {
@@ -58,33 +64,13 @@ function diffPatch(task: Task, f: FormState): Partial<TaskInput> {
     title: task.title, description: task.description || null, assigned_to: task.assigned_to,
     period_shift: task.period_shift, due_date: task.due_date, due_time: task.due_time?.slice(0, 5) ?? null,
     recurrence_rule: task.recurrence_rule, priority: task.priority, requires_approval: task.requires_approval,
+    is_personal: task.is_personal,
   };
   const patch: Record<string, unknown> = {};
   (Object.keys(next) as (keyof TaskInput)[]).forEach((k) => {
     if (next[k] !== prev[k]) patch[k] = next[k];
   });
   return patch as Partial<TaskInput>;
-}
-
-// Helpers para faixas de horário por turno
-function getShiftLimits(shift: PeriodShift) {
-  switch (shift) {
-    case 'morning':
-      return { min: '00:00', max: '11:55' };
-    case 'afternoon':
-      return { min: '12:00', max: '17:55' };
-    case 'night':
-      return { min: '18:00', max: '23:55' };
-    default:
-      return { min: undefined, max: undefined };
-  }
-}
-
-function getShiftFromTime(time: string): PeriodShift {
-  if (!time) return 'anytime';
-  if (time >= '00:00' && time <= '11:59') return 'morning';
-  if (time >= '12:00' && time <= '17:59') return 'afternoon';
-  return 'night';
 }
 
 export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
@@ -113,34 +99,25 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
   const needsApproval = !!task?.requires_approval;
 
-  // Ponto 4: Ao mudar turno, se o horário atual não couber no limite, limpa o horário
-  const handleShiftChange = (shift: PeriodShift) => {
-    const limits = getShiftLimits(shift);
-    let nextTime = form.due_time;
-    if (shift !== 'anytime' && form.due_time) {
-      if (limits.min && form.due_time < limits.min) nextTime = '';
-      if (limits.max && form.due_time > limits.max) nextTime = '';
-    }
-    setForm((f) => ({ ...f, period_shift: shift, due_time: nextTime }));
-  };
+  // Troca de turno: o horário é sempre zerado (e "A qualquer hora" também)
+  const handleShiftChange = (shift: PeriodShift) =>
+    setForm((f) => ({ ...f, period_shift: shift, due_time: '' }));
 
-  // Ponto 5: Ao alterar horário, sincroniza o turno correspondente
-  const handleTimeChange = (time: string) => {
-    if (!time) {
-      set('due_time', '');
-      return;
-    }
-    const detectedShift = getShiftFromTime(time);
-    setForm((f) => ({
-      ...f,
-      due_time: time,
-      period_shift: detectedShift,
-    }));
-  };
+  // Escolha de horário: o turno acompanha o horário
+  const handleTimeChange = (time: string) =>
+    setForm((f) => ({ ...f, due_time: time, period_shift: time ? shiftForTime(time) : f.period_shift }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) return setError('Informe um título.');
+    if (!timeMatchesShift(form.period_shift, form.due_time)) {
+      const r = SHIFT_TIME_RANGE[form.period_shift];
+      return setError(
+        form.period_shift === 'anytime'
+          ? 'O turno "A qualquer hora" não aceita horário.'
+          : `O horário deve estar entre ${r.min} e ${r.max} para o turno ${SHIFT_LABEL[form.period_shift]}.`,
+      );
+    }
     setSaving(true);
     setError(null);
     try {
@@ -164,7 +141,10 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
 
   const input = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none';
   const label = 'mb-1 block text-xs font-medium text-slate-600';
-  const timeLimits = getShiftLimits(form.period_shift);
+  const timeOptions = timesForShift(form.period_shift);
+  // tarefas antigas podem ter horário fora do passo de 5 min: mantém a opção visível
+  if (form.due_time && !timeOptions.includes(form.due_time)) timeOptions.push(form.due_time);
+  const personal = form.is_personal;
 
   return (
     <Modal open={open} onClose={onClose} title={task ? 'Editar tarefa' : 'Nova tarefa'}>
@@ -181,14 +161,14 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
+          {!personal && <div>
             <label className={label}>Responsável</label>
             <select className={input} value={form.assigned_to ?? ''}
                     onChange={(e) => set('assigned_to', e.target.value || null)}>
               <option value="">Ambos</option>
               {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
             </select>
-          </div>
+          </div>}
           <div>
             <label className={label}>Data</label>
             <input type="date" className={input} value={form.due_date}
@@ -203,17 +183,11 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
           </div>
           <div>
             <label className={label}>Horário (opcional)</label>
-            <div className="flex gap-1">
-              <input type="time" className={input} value={form.due_time}
-                     min={timeLimits.min} max={timeLimits.max}
-                     onChange={(e) => handleTimeChange(e.target.value)} />
-              {form.due_time && (
-                <button type="button" onClick={() => set('due_time', '')}
-                        className="rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100" aria-label="Remover horário">
-                  Limpar
-                </button>
-              )}
-            </div>
+            <select className={input} value={form.due_time}
+                    onChange={(e) => handleTimeChange(e.target.value)}>
+              <option value="">Sem horário</option>
+              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
           <div>
             <label className={label}>Recorrência</label>
@@ -231,7 +205,22 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+        {(!task || task.is_personal) && (
+          <label className={`flex items-start gap-3 rounded-xl border border-slate-300 bg-slate-50 p-3 ${task ? '' : 'cursor-pointer'}`}>
+            <input type="checkbox" className="mt-1 h-4 w-4" checked={personal} disabled={!!task}
+                   onChange={(e) => setForm((f) => ({ ...f, is_personal: e.target.checked, requires_approval: false }))} />
+            <span className="text-sm">
+              <span className="flex items-center gap-1 font-medium text-slate-800">
+                <Lock className="h-4 w-4" /> Tarefa pessoal
+              </span>
+              <span className="block text-xs text-slate-600">
+                Somente você poderá ver, editar e excluir esta tarefa. Seu parceiro(a) não a enxerga.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {!personal && <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
           <input type="checkbox" className="mt-1 h-4 w-4" checked={form.requires_approval}
                  onChange={(e) => set('requires_approval', e.target.checked)} />
           <span className="text-sm">
@@ -243,7 +232,7 @@ export function TaskFormDialog({ open, task, defaultDate, onClose }: Props) {
               {needsApproval && ' Desativar esta opção também exigirá aprovação.'}
             </span>
           </span>
-        </label>
+        </label>}
 
         {needsApproval && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">

@@ -8,6 +8,7 @@ import { useHousehold } from '@/hooks/useHousehold';
 import { useApprovals } from '@/hooks/useRealtimeFeeds';
 import { useTaskActions } from '@/components/TaskActionsProvider';
 import { MemberAvatar } from '@/components/MemberAvatar';
+import { SettingsMenu } from '@/components/SettingsMenu';
 import { MutualApprovalModal } from '@/components/MutualApprovalModal';
 import { cn, toISODate } from '@/lib/utils';
 
@@ -42,6 +43,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <Link
         href={item.href}
+        onClick={() => {
+          if (item.href === '/planejador') window.dispatchEvent(new Event('planner:reset'));
+        }}
         className={cn(
           'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition',
           mobile && 'flex-col gap-0.5 px-2 py-1 text-[10px]',
@@ -102,16 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </span>
               </div>
             )}
-            <div
-              className="flex items-center gap-2 rounded-full border bg-slate-50 py-1 pl-1 pr-3"
-              title={`Você está logado como ${me.display_name}`}
-            >
-              <MemberAvatar member={me} online={onlineMemberIds.has(me.id)} editing={editingMemberIds.has(me.id)} />
-              <span className="leading-tight">
-                <span className="block text-[10px] text-slate-500">Logado como</span>
-                <span className="block max-w-28 truncate text-xs font-semibold">{me.display_name}</span>
-              </span>
-            </div>
+            <SettingsMenu />
           </div>
         </header>
 

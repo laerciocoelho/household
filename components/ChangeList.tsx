@@ -16,6 +16,7 @@ const FIELD_LABEL: Record<string, string> = {
   recurrence_rule: 'Recorrência',
   priority: 'Prioridade',
   requires_approval: 'Aprovação mútua',
+  is_personal: 'Tarefa pessoal',
 };
 
 /** Mostra "como era → como ficou" para cada campo alterado. */
@@ -37,6 +38,7 @@ export function ChangeList({ changes }: { changes: FieldChange[] | null | undefi
         return RECURRENCE_LABEL[v as RecurrenceRule] ?? String(v);
       case 'priority':
         return PRIORITY_LABEL[v as TaskPriority] ?? String(v);
+      case 'is_personal':
       case 'requires_approval':
         return v ? 'Ativada' : 'Desativada';
       default:

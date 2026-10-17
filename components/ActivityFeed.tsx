@@ -7,7 +7,8 @@ import { useHousehold } from '@/hooks/useHousehold';
 import { useActivityLogs } from '@/hooks/useRealtimeFeeds';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { ChangeList } from '@/components/ChangeList';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, fromISODate } from '@/lib/utils';
+import { format } from 'date-fns';
 import type { ActivityAction } from '@/types/database';
 
 const ACTION_ICON: Record<ActivityAction, LucideIcon> = {
@@ -21,6 +22,14 @@ const ACTION_ICON: Record<ActivityAction, LucideIcon> = {
   rejected: XCircle,
   cancelled: Undo2,
 };
+
+/** Anexa a data de atribuição da tarefa ao título: Editou a tarefa "Título - dd/mm/aaaa" */
+function withTaskDate(summary: string, taskDate?: string | null) {
+  if (!taskDate) return summary;
+  const date = format(fromISODate(taskDate), 'dd/MM/yyyy');
+  const i = summary.lastIndexOf('"');
+  return i > 0 ? `${summary.slice(0, i)} - ${date}${summary.slice(i)}` : summary;
+}
 
 export function ActivityFeed() {
   const { memberById } = useHousehold();
@@ -44,7 +53,7 @@ export function ActivityFeed() {
               <p className="flex items-start gap-2 text-sm">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
                 <span>
-                  <b>{member?.display_name ?? 'Alguém'}</b> — {log.summary}
+                  <b>{member?.display_name ?? 'Alguém'}</b> — {withTaskDate(log.summary, d?.task_date)}
                 </span>
               </p>
               <ChangeList changes={d?.changes} />

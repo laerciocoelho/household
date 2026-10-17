@@ -66,6 +66,7 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
         className={cn(
           'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200',
           'active:scale-75 disabled:cursor-not-allowed',
+          lockedByOther && 'blur-[1.5px] select-none',
           done ? 'scale-100 border-transparent text-white' : 'border-slate-300 hover:border-slate-400'
         )}
         style={done ? { backgroundColor: accent } : undefined}
@@ -73,7 +74,7 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
         <Check className={cn('h-4 w-4 transition-transform duration-200', done ? 'scale-100' : 'scale-0')} />
       </button>
 
-      <div className="min-w-0 flex-1">
+      <div className={cn('min-w-0 flex-1', lockedByOther && 'blur-[1.5px] select-none')}>
         <div className="flex flex-wrap items-baseline gap-x-2">
           <p className={cn('text-sm font-medium leading-snug', done && 'line-through text-slate-500')}>
             {task.title}
@@ -116,6 +117,11 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
               <Flag className="h-3 w-3" /> Alta
             </span>
           )}
+          {task.is_personal && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
+              <Lock className="h-3 w-3" /> Pessoal
+            </span>
+          )}
           {overdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">Atrasada</span>}
           {pendingApproval && (
             <span className="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900">
@@ -134,14 +140,9 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
           </button>
         )}
 
-        {lockedByOther && locker && (
-          <p className="mt-1.5 flex items-center gap-1 text-xs font-medium" style={{ color: locker.color_hex }}>
-            <Lock className="h-3 w-3" /> {locker.display_name} está editando esta tarefa agora
-          </p>
-        )}
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className={cn('flex shrink-0 flex-col items-end gap-1', lockedByOther && 'blur-[1.5px] select-none')}>
         <MemberAvatar member={assignee} size="xs" />
         <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
           <button
@@ -164,6 +165,14 @@ export function TaskCard({ task, compact, draggable, onToggle, onEdit, onDelete 
           </button>
         </div>
       </div>
+
+      {lockedByOther && locker && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/30 px-3">
+          <p className="flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1 text-center text-xs font-bold text-red-600 shadow-sm">
+            <Lock className="h-3.5 w-3.5 shrink-0" /> {locker.display_name} está editando esta tarefa agora
+          </p>
+        </div>
+      )}
     </div>
   );
 }

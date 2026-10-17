@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useHousehold } from '@/hooks/useHousehold';
 import { DailyView } from '@/components/DailyView';
 import { WeeklyView } from '@/components/WeeklyView';
 import { MonthlyView } from '@/components/MonthlyView';
@@ -15,7 +16,17 @@ const TABS = [
 type Tab = (typeof TABS)[number]['key'];
 
 export default function PlanejadorPage() {
-  const [tab, setTab] = useState<Tab>('today');
+  const { me } = useHousehold();
+  const preferred: Tab = me.preferred_view ?? 'today';
+  const [tab, setTab] = useState<Tab>(preferred);
+
+  // Clicar em "Planejamento" (já na tela) volta para a visão preferida
+  useEffect(() => {
+    const reset = () => setTab(preferred);
+    window.addEventListener('planner:reset', reset);
+    return () => window.removeEventListener('planner:reset', reset);
+  }, [preferred]);
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
       <div className="inline-flex rounded-lg border bg-white p-1 text-sm">

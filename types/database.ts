@@ -14,6 +14,8 @@ export type ActivityAction =
   | 'rejected'
   | 'cancelled';
 
+export type PreferredView = 'today' | 'week' | 'month';
+
 export interface Household {
   id: string;
   name: string;
@@ -29,6 +31,7 @@ export interface HouseholdMember {
   display_name: string;
   color_hex: string;
   icon_name: string;
+  preferred_view: PreferredView;
   is_owner: boolean;
   created_at: string;
 }
@@ -44,6 +47,7 @@ export interface Task {
   due_time: string | null; // 'HH:mm:ss' (opcional)
   recurrence_rule: RecurrenceRule;
   priority: TaskPriority;
+  is_personal: boolean; // somente o criador cria/vê/edita
   requires_approval: boolean; // ajuste/exclusão exigem aprovação do parceiro
   pending_action: 'edit' | 'delete' | null;
   pending_by: string | null;
@@ -60,7 +64,7 @@ export interface Task {
 export type TaskInput = Pick<
   Task,
   'title' | 'description' | 'assigned_to' | 'period_shift' | 'due_date' | 'due_time'
-  | 'recurrence_rule' | 'priority' | 'requires_approval'
+  | 'recurrence_rule' | 'priority' | 'requires_approval' | 'is_personal'
 >;
 
 export interface ApprovalRequest {
@@ -94,6 +98,8 @@ export interface ActivityDetails {
   changes?: FieldChange[];
   request_note?: string | null;
   decision_note?: string | null;
+  task_date?: string | null; // data de atribuição da tarefa (due_date)
+  task_time?: string | null;
 }
 
 export interface ActivityLog {
