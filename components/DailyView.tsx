@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { format, startOfDay } from 'date-fns';
+import { CheckCircle2 } from 'lucide-react';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
 import { useTaskActions } from '@/components/TaskActionsProvider';
 import { TaskCard } from '@/components/TaskCard';
+import { OverdueSection, selectOverdue } from '@/components/OverdueSection';
 import { SHIFTS } from '@/lib/constants';
 import { formatLong, sortTasks } from '@/lib/utils';
 import type { Task } from '@/types/database';
@@ -16,21 +17,14 @@ export function DailyView() {
   const today = startOfDay(new Date());
   const todayISO = format(today, 'yyyy-MM-dd');
 
-  const { overdue, overduePending, byShift, total, done } = useMemo(() => {
-    const completedToday = (t: Task) =>
-      t.status === 'completed' && !!t.completed_at && isSameDay(parseISO(t.completed_at), new Date());
-
-    // Atrasadas: pendentes + as que foram concluídas HOJE (ficam visíveis até o fim do dia)
-    const overdue = sortTasks(
-      tasks.filter((t) => t.due_date < todayISO && (t.status !== 'completed' || completedToday(t)))
-    );
+  const { overdue, byShift, total, done } = useMemo(() => {
+    const overdue = selectOverdue(tasks);
     const todays = tasks.filter((t) => t.due_date === todayISO);
     const byShift = SHIFTS.map((s) => ({
       ...s, items: sortTasks(todays.filter((t) => t.period_shift === s.key)),
     }));
     return {
       overdue,
-      overduePending: overdue.filter((t) => t.status !== 'completed').length,
       byShift,
       total: todays.length,
       done: todays.filter((t) => t.status === 'completed').length,
@@ -51,16 +45,14 @@ export function DailyView() {
         <p className="text-sm text-slate-500">
           {total === 0 ? 'Nada para hoje.' : `${done} de ${total} concluídas`}
         </p>
+        {overdue.items.length > 0 && (
+          <p className="text-sm text-red-600">
+            Atrasadas: {overdue.done} de {overdue.items.length} concluídas
+          </p>
+        )}
       </div>
 
-      {overdue.length > 0 && (
-        <section className="rounded-2xl border border-red-200 bg-red-50 p-3">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700">
-            <AlertTriangle className="h-4 w-4" /> Atrasadas ({overduePending})
-          </h2>
-          <div className="space-y-2">{overdue.map(card)}</div>
-        </section>
-      )}
+      <OverdueSection items={overdue.items} done={overdue.done} />
 
       {byShift.map((g) =>
         g.items.length === 0 ? null : (
@@ -71,7 +63,7 @@ export function DailyView() {
         )
       )}
 
-      {total === 0 && overdue.length === 0 && (
+      {total === 0 && overdue.items.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-12 text-slate-500">
           <CheckCircle2 className="h-10 w-10" />
           <p>Tudo em dia!</p>

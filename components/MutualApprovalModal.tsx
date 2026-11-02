@@ -6,7 +6,7 @@ import { Modal } from '@/components/Modal';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { ChangeList } from '@/components/ChangeList';
 import { useHousehold } from '@/hooks/useHousehold';
-import { useApprovals } from '@/hooks/useRealtimeFeeds';
+import { useApprovalHistory, useApprovals } from '@/hooks/useRealtimeFeeds';
 import { formatDateTime } from '@/lib/utils';
 import type { ApprovalRequest } from '@/types/database';
 
@@ -26,10 +26,67 @@ function Quote({ label, text }: { label: string; text?: string | null }) {
   );
 }
 
+/**
+ * Histórico: por padrão só a solicitação resolvida mais recente.
+ * O restante só é buscado no banco quando o usuário pede o histórico completo.
+ */
+function ApprovalHistory() {
+  const { memberById } = useHousehold();
+  const [full, setFull] = useState(false);
+  const { items, isLoading, hasMore, loadMore, loadingMore } = useApprovalHistory(full);
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-600">{full ? 'Histórico completo' : 'Mais recente'}</h3>
+        <button onClick={() => setFull((f) => !f)}
+                className="rounded-lg border px-3 py-1 text-xs font-medium hover:bg-slate-50">
+          {full ? 'Ver apenas a mais recente' : 'Ver histórico completo'}
+        </button>
+      </div>
+      {isLoading && <p className="text-sm text-slate-500">Carregando…</p>}
+      {!isLoading && items.length === 0 && <p className="text-sm text-slate-500">Nenhuma solicitação respondida ainda.</p>}
+          {items.map((r) => {
+            const reviewer = memberById(r.reviewed_by);
+            const statusText =
+              r.status === 'approved' ? `Aprovada por ${reviewer?.display_name ?? '—'}`
+              : r.status === 'rejected' ? `Recusada por ${reviewer?.display_name ?? '—'}`
+              : 'Cancelada pelo autor';
+            const statusColor =
+              r.status === 'approved' ? 'text-emerald-600' : r.status === 'rejected' ? 'text-red-600' : 'text-slate-500';
+            return (
+              <div key={r.id} className="rounded-xl border bg-white p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <span>
+                    {memberById(r.requested_by)?.display_name}: “{r.proposed_payload?.title ?? 'tarefa'}”{' '}
+                    <em className="text-xs text-slate-500">({KIND_LABEL[r.entity_type] ?? 'solicitação'})</em>
+                  </span>
+                  <span className={`text-xs font-medium ${statusColor}`}>{statusText}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Solicitada em {formatDateTime(r.created_at)}
+                  {r.reviewed_at && ` · ${r.status === 'cancelled' ? 'Cancelada' : 'Respondida'} em ${formatDateTime(r.reviewed_at)}`}
+                </p>
+                <Quote label="Motivo" text={r.request_note} />
+                <Quote label="Justificativa" text={r.decision_note} />
+                {r.entity_type === 'task_edit' && <ChangeList changes={r.proposed_payload?.changes} />}
+              </div>
+            );
+          })}
+      {full && hasMore && (
+        <button onClick={loadMore} disabled={loadingMore}
+                className="w-full rounded-lg border py-2 text-sm hover:bg-slate-50 disabled:opacity-50">
+          {loadingMore ? 'Carregando…' : 'Carregar mais'}
+        </button>
+      )}
+    </section>
+  );
+}
+
 /** Lista reutilizável (usada na página /aprovacoes e no modal). */
 export function ApprovalList({ showHistory = false }: { showHistory?: boolean }) {
   const { memberById } = useHousehold();
-  const { pendingForMe, pendingByMe, all, decide, cancel } = useApprovals();
+  const { pendingForMe, pendingByMe, decide, cancel } = useApprovals();
   const [error, setError] = useState<string | null>(null);
   const [refusing, setRefusing] = useState<string | null>(null); // id da solicitação em recusa
   const [note, setNote] = useState('');
@@ -54,8 +111,6 @@ export function ApprovalList({ showHistory = false }: { showHistory?: boolean })
     setError(null);
     cancel.mutate(req.id, { onError });
   };
-
-  const history = all.filter((r) => r.status !== 'pending');
 
   return (
     <div className="space-y-4">
@@ -148,38 +203,7 @@ export function ApprovalList({ showHistory = false }: { showHistory?: boolean })
         </section>
       )}
 
-      {showHistory && history.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold text-slate-600">Histórico</h3>
-          {history.map((r) => {
-            const reviewer = memberById(r.reviewed_by);
-            const statusText =
-              r.status === 'approved' ? `Aprovada por ${reviewer?.display_name ?? '—'}`
-              : r.status === 'rejected' ? `Recusada por ${reviewer?.display_name ?? '—'}`
-              : 'Cancelada pelo autor';
-            const statusColor =
-              r.status === 'approved' ? 'text-emerald-600' : r.status === 'rejected' ? 'text-red-600' : 'text-slate-500';
-            return (
-              <div key={r.id} className="rounded-xl border bg-white p-3 text-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <span>
-                    {memberById(r.requested_by)?.display_name}: “{r.proposed_payload?.title ?? 'tarefa'}”{' '}
-                    <em className="text-xs text-slate-500">({KIND_LABEL[r.entity_type] ?? 'solicitação'})</em>
-                  </span>
-                  <span className={`text-xs font-medium ${statusColor}`}>{statusText}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  Solicitada em {formatDateTime(r.created_at)}
-                  {r.reviewed_at && ` · ${r.status === 'cancelled' ? 'Cancelada' : 'Respondida'} em ${formatDateTime(r.reviewed_at)}`}
-                </p>
-                <Quote label="Motivo" text={r.request_note} />
-                <Quote label="Justificativa" text={r.decision_note} />
-                {r.entity_type === 'task_edit' && <ChangeList changes={r.proposed_payload?.changes} />}
-              </div>
-            );
-          })}
-        </section>
-      )}
+      {showHistory && <ApprovalHistory />}
     </div>
   );
 }

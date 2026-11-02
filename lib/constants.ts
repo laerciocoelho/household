@@ -1,10 +1,12 @@
 import {
+  Plane, Sofa, Wrench, ShoppingBag, Sparkle,
   Coffee, Cat, Sparkles, Heart, Star, Moon, Sun, Flower2, Leaf, Flame, Rocket, Smile,
-  type LucideIcon,
 } from 'lucide-react';
-import type { PeriodShift, PreferredView, RecurrenceRule, TaskPriority } from '@/types/database';
+import { BoyIcon, CoupleIcon, GirlIcon, ManIcon, WomanIcon, type IconComponent } from '@/lib/personIcons';
+import type { PeriodShift, PlanCategory, PreferredView, RecurrenceRule, TaskPriority } from '@/types/database';
 
-export const MEMBER_ICONS: Record<string, LucideIcon> = {
+export const MEMBER_ICONS: Record<string, IconComponent> = {
+  man: ManIcon, woman: WomanIcon, girl: GirlIcon, boy: BoyIcon, couple: CoupleIcon,
   coffee: Coffee, cat: Cat, sparkles: Sparkles, heart: Heart, star: Star, moon: Moon,
   sun: Sun, flower: Flower2, leaf: Leaf, flame: Flame, rocket: Rocket, smile: Smile,
 };
@@ -75,3 +77,11 @@ export function timeMatchesShift(shift: PeriodShift, time: string): boolean {
   const { min, max } = SHIFT_TIME_RANGE[shift];
   return time >= min && time <= max;
 }
+
+export const PLAN_CATEGORIES: Record<PlanCategory, { label: string; color: string; icon: IconComponent }> = {
+  trip: { label: 'Viagem', color: '#0EA5E9', icon: Plane },
+  home: { label: 'Casa / Decoração', color: '#F59E0B', icon: Sofa },
+  maintenance: { label: 'Manutenção', color: '#64748B', icon: Wrench },
+  shopping: { label: 'Compras', color: '#EC4899', icon: ShoppingBag },
+  other: { label: 'Outros', color: '#8B5CF6', icon: Sparkle },
+};

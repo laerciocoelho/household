@@ -7,6 +7,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
 import { useTaskActions } from '@/components/TaskActionsProvider';
+import { OverdueSection, selectOverdue } from '@/components/OverdueSection';
 import { AssignTargets, DayCell, DayTasks, PeriodNav, usePlannerDnD } from '@/components/PlannerParts';
 import { groupByDay, toISODate } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ export function MonthlyView() {
   }), [cursor]);
 
   const byDay = useMemo(() => groupByDay(tasks), [tasks]);
+  const overdue = useMemo(() => selectOverdue(tasks), [tasks]);
 
   return (
     <div className="space-y-4">
@@ -61,6 +63,8 @@ export function MonthlyView() {
           />
         ))}
       </div>
+
+      <OverdueSection items={overdue.items} done={overdue.done} />
 
       <DayTasks day={selected} tasks={byDay.get(toISODate(selected)) ?? []} />
     </div>

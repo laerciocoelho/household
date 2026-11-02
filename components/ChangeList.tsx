@@ -2,9 +2,9 @@
 
 import { format, parseISO } from 'date-fns';
 import { useHousehold } from '@/hooks/useHousehold';
-import { PRIORITY_LABEL, RECURRENCE_LABEL, SHIFT_LABEL } from '@/lib/constants';
+import { PLAN_CATEGORIES, PRIORITY_LABEL, RECURRENCE_LABEL, SHIFT_LABEL } from '@/lib/constants';
 import { formatTime } from '@/lib/utils';
-import type { FieldChange, PeriodShift, RecurrenceRule, TaskPriority } from '@/types/database';
+import type { FieldChange, PeriodShift, PlanCategory, RecurrenceRule, TaskPriority } from '@/types/database';
 
 const FIELD_LABEL: Record<string, string> = {
   title: 'Título',
@@ -17,6 +17,14 @@ const FIELD_LABEL: Record<string, string> = {
   priority: 'Prioridade',
   requires_approval: 'Aprovação mútua',
   is_personal: 'Tarefa pessoal',
+  category: 'Categoria',
+  status: 'Status',
+  column: 'Coluna',
+  target_date: 'Data-alvo',
+};
+
+const LEGACY_STATUS: Record<string, string> = {
+  idea: 'Ideia', planning: 'Planejando', in_progress: 'Em andamento', done: 'Concluído',
 };
 
 /** Mostra "como era → como ficou" para cada campo alterado. */
@@ -38,6 +46,12 @@ export function ChangeList({ changes }: { changes: FieldChange[] | null | undefi
         return RECURRENCE_LABEL[v as RecurrenceRule] ?? String(v);
       case 'priority':
         return PRIORITY_LABEL[v as TaskPriority] ?? String(v);
+      case 'category':
+        return PLAN_CATEGORIES[v as PlanCategory]?.label ?? String(v);
+      case 'status':
+        return LEGACY_STATUS[String(v)] ?? String(v); // registros anteriores às colunas personalizadas
+      case 'target_date':
+        return v ? format(parseISO(v as string), 'dd/MM/yyyy') : 'Sem data';
       case 'is_personal':
       case 'requires_approval':
         return v ? 'Ativada' : 'Desativada';

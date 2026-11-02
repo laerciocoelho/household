@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase/client';
+import { friendlyAuthError } from '@/lib/authErrors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,11 +22,11 @@ export default function LoginPage() {
     const supabase = getSupabase();
     if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
+      if (error) setError(friendlyAuthError(error));
       else { router.replace('/hoje'); router.refresh(); }
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) setError(error.message);
+      if (error) setError(friendlyAuthError(error));
       else if (data.session) { router.replace('/onboarding'); router.refresh(); }
       else setInfo('Conta criada! Confirme o e-mail enviado e depois entre.');
     }

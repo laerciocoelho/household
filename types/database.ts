@@ -86,6 +86,7 @@ export interface ApprovalRequest {
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  requester_ack_at: string | null; // quando o autor viu a recusa
 }
 
 export interface FieldChange {
@@ -126,3 +127,41 @@ export interface PresenceState {
   editingTaskId: string | null;
   onlineAt: number;
 }
+
+export type PlanCategory = 'trip' | 'home' | 'maintenance' | 'shopping' | 'other';
+
+export interface PlanColumn {
+  id: string;
+  household_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+}
+
+export interface Plan {
+  id: string;
+  household_id: string;
+  title: string;
+  description: string | null;
+  category: PlanCategory;
+  column_id: string; // coluna do quadro
+  target_date: string | null; // 'yyyy-MM-dd'
+  is_personal: boolean; // somente o criador vê/edita
+  created_by: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanItem {
+  id: string;
+  plan_id: string;
+  household_id: string;
+  title: string;
+  assigned_to: string | null; // null = Ambos
+  due_date: string | null;
+  done: boolean;
+  created_at: string;
+}
+
+export type PlanInput = Pick<Plan, 'title' | 'description' | 'category' | 'column_id' | 'target_date' | 'is_personal'>;

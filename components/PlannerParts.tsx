@@ -38,18 +38,21 @@ export function usePlannerDnD(tasks: Task[]) {
 }
 export type PlannerDnD = ReturnType<typeof usePlannerDnD>;
 
-/** Navegação de período: setas nas extremidades e descritivo centralizado. */
+const circleBtn =
+  'flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100';
+
+/** Navegação de período: descritivo centralizado com as setas (em círculo) logo ao lado. */
 export function PeriodNav({
   label, onPrev, onNext, prevLabel, nextLabel, capitalize,
 }: { label: string; onPrev: () => void; onNext: () => void; prevLabel: string; nextLabel: string; capitalize?: boolean }) {
   return (
-    <div className="flex items-center justify-between">
-      <button onClick={onPrev} className="rounded p-1.5 hover:bg-slate-100" aria-label={prevLabel}>
-        <ChevronLeft className="h-5 w-5" />
+    <div className="flex items-center justify-center gap-3">
+      <button onClick={onPrev} className={circleBtn} aria-label={prevLabel}>
+        <ChevronLeft className="h-4 w-4" />
       </button>
-      <h2 className={cn('flex-1 text-center text-base font-semibold', capitalize && 'capitalize')}>{label}</h2>
-      <button onClick={onNext} className="rounded p-1.5 hover:bg-slate-100" aria-label={nextLabel}>
-        <ChevronRight className="h-5 w-5" />
+      <h2 className={cn('min-w-36 text-center text-base font-semibold', capitalize && 'capitalize')}>{label}</h2>
+      <button onClick={onNext} className={circleBtn} aria-label={nextLabel}>
+        <ChevronRight className="h-4 w-4" />
       </button>
     </div>
   );

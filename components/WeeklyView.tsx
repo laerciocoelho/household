@@ -5,6 +5,7 @@ import { addDays, addWeeks, endOfWeek, format, isSameDay, startOfWeek } from 'da
 import { ptBR } from 'date-fns/locale';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
 import { useTaskActions } from '@/components/TaskActionsProvider';
+import { OverdueSection, selectOverdue } from '@/components/OverdueSection';
 import { AssignTargets, DayCell, DayTasks, PeriodNav, usePlannerDnD } from '@/components/PlannerParts';
 import { groupByDay, toISODate } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ export function WeeklyView() {
   const weekEnd = endOfWeek(selected, { weekStartsOn: 0 });
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const byDay = useMemo(() => groupByDay(tasks), [tasks]);
+  const overdue = useMemo(() => selectOverdue(tasks), [tasks]);
 
   const label = `${format(weekStart, 'd MMM', { locale: ptBR })} – ${format(weekEnd, 'd MMM', { locale: ptBR })}`;
 
@@ -51,6 +53,8 @@ export function WeeklyView() {
           />
         ))}
       </div>
+
+      <OverdueSection items={overdue.items} done={overdue.done} />
 
       <DayTasks day={selected} tasks={byDay.get(toISODate(selected)) ?? []} />
     </div>

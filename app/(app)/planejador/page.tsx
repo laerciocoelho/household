@@ -29,6 +29,7 @@ export default function PlanejadorPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
+      <div className="flex justify-center">
       <div className="inline-flex rounded-lg border bg-white p-1 text-sm">
         {TABS.map((t) => (
           <button
@@ -39,6 +40,7 @@ export default function PlanejadorPage() {
             {t.label}
           </button>
         ))}
+      </div>
       </div>
       {tab === 'today' && <DailyView />}
       {tab === 'week' && <WeeklyView />}

@@ -57,6 +57,7 @@ export function TaskActionsProvider({ children }: { children: ReactNode }) {
     openEdit: (task) => { if (!guardLock(task)) setDialog({ open: true, task }); },
     toggle: (task) => {
       if (guardLock(task)) return;
+      if (task.status === 'completed' && !window.confirm(`Reativar a tarefa "${task.title}"? Ela voltará a ficar pendente.`)) return;
       toggleComplete.mutate(task, { onError: (e) => notify((e as Error).message) });
     },
     remove: (task) => {

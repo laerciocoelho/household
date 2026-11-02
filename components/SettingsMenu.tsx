@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import type { HouseholdMember, PreferredView } from '@/types/database';
 
 /** Chip "Logado como" que abre o menu de configurações do usuário */
-export function SettingsMenu() {
+export function SettingsMenu({ compact = false }: { compact?: boolean }) {
   const { me, partner, onlineMemberIds, editingMemberIds } = useHousehold();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -66,16 +66,17 @@ export function SettingsMenu() {
       <button
         type="button"
         onClick={openMenu}
-        className="flex items-center gap-2 rounded-full border bg-slate-50 py-1 pl-1 pr-2.5 hover:bg-slate-100"
+        className={cn('flex items-center gap-2 rounded-full border bg-slate-50 py-1 hover:bg-slate-100',
+          compact ? 'justify-center px-1' : 'pl-1 pr-2.5')}
         title={`Você está logado como ${me.display_name} — abrir configurações`}
         aria-label="Abrir configurações do usuário"
       >
         <MemberAvatar member={me} online={onlineMemberIds.has(me.id)} editing={editingMemberIds.has(me.id)} />
-        <span className="text-left leading-tight">
+        <span className={cn('min-w-0 flex-1 text-left leading-tight', compact && 'hidden')}>
           <span className="block text-[10px] text-slate-500">Logado como</span>
           <span className="block max-w-28 truncate text-xs font-semibold">{me.display_name}</span>
         </span>
-        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+        {!compact && <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />}
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Configurações">
@@ -116,7 +117,7 @@ export function SettingsMenu() {
             <div className="grid grid-cols-3 gap-1 rounded-lg border bg-slate-50 p-1 text-sm">
               {(Object.keys(VIEW_LABEL) as PreferredView[]).map((v) => (
                 <button type="button" key={v} onClick={() => setView(v)}
-                        className={cn('rounded-md py-1.5', view === v ? 'bg-white font-medium shadow' : 'text-slate-600')}>
+                        className={cn('rounded-md py-1.5', view === v ? 'bg-slate-900 font-medium text-white shadow' : 'text-slate-600 hover:bg-slate-100')}>
                   {VIEW_LABEL[v]}
                 </button>
               ))}
