@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, CalendarClock, Lock, Plus, Settings2, X } from 'lucide-react';
+import { Modal } from '@/components/Modal';
 import { PlanDialog } from '@/components/PlanDialog';
 import { PlanColumnsDialog } from '@/components/PlanColumnsDialog';
 import { useRealtimePlans } from '@/hooks/useRealtimePlans';
@@ -14,7 +15,10 @@ import type { Plan, PlanCategory } from '@/types/database';
 const MIME = 'text/plan-id';
 const MAX_ITEMS_ON_CARD = 5;
 
-interface Warning { text: string; undo: () => void }
+/** Ignora acentos/maiúsculas para reconhecer as colunas pelo nome. */
+const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+interface MoveQuestion { plan: Plan; toName: string; pending: number; total: number; resolve: (ok: boolean) => void }
 
 export function PlansView() {
   const { plans, items, columns, isLoading, movePlan, toggleItem } = useRealtimePlans();
@@ -22,18 +26,8 @@ export function PlansView() {
   const [dialog, setDialog] = useState<{ open: boolean; planId: string | null }>({ open: false, planId: null });
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [hoverCol, setHoverCol] = useState<string | null>(null);
-  const [warning, setWarning] = useState<Warning | null>(null);
+  const [question, setQuestion] = useState<MoveQuestion | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const showWarning = (w: Warning) => {
-    clearTimeout(timer.current);
-    setWarning(w);
-    timer.current = setTimeout(() => setWarning(null), 10_000);
-  };
-
   const visible = useMemo(
     () => plans
       .filter((p) => filter === 'all' || p.category === filter)
@@ -45,34 +39,34 @@ export function PlansView() {
   const itemsOf = (p: Plan) => items.filter((i) => i.plan_id === p.id);
   const dialogPlan = plans.find((p) => p.id === dialog.planId) ?? null;
 
-  /** Avisa quando um plano com etapas pendentes avança para uma coluna à frente. */
-  const warnIfForward = (plan: Plan, fromId: string, toId: string) => {
-    const from = columns.find((c) => c.id === fromId);
+  /**
+   * Só a passagem "Em andamento" -> "Concluído" é validada: se o plano ainda tem etapas pendentes,
+   * pergunta se deseja mesmo mover. Resolve `true` quando pode mover (sem validação ou confirmado).
+   */
+  const askMove = (plan: Plan, toId: string): Promise<boolean> => {
+    const from = columns.find((c) => c.id === plan.column_id);
     const to = columns.find((c) => c.id === toId);
-    const pending = itemsOf(plan).filter((i) => !i.done).length;
-    if (!from || !to || to.position <= from.position || pending === 0) return;
-    const total = itemsOf(plan).length;
-    showWarning({
-      text: `“${plan.title}” foi para “${to.name}” com ${pending} de ${total} etapas ainda pendentes.`,
-      undo: () => {
-        const latest = plans.find((p) => p.id === plan.id) ?? plan;
-        movePlan.mutate({ plan: latest, columnId: fromId }, { onError: (e) => setError((e as Error).message) });
-        setWarning(null);
-      },
-    });
+    const its = itemsOf(plan);
+    const pending = its.filter((i) => !i.done).length;
+    const guarded = !!from && !!to && norm(from.name) === 'em andamento' && norm(to.name) === 'concluido';
+    if (!guarded || pending === 0) return Promise.resolve(true);
+    return new Promise((resolve) =>
+      setQuestion({ plan, toName: to!.name, pending, total: its.length, resolve }));
   };
 
-  const drop = (e: DragEvent, columnId: string) => {
+  const answer = (ok: boolean) => {
+    question?.resolve(ok);
+    setQuestion(null);
+  };
+
+  const drop = async (e: DragEvent, columnId: string) => {
     e.preventDefault();
     setHoverCol(null);
     const plan = plans.find((p) => p.id === e.dataTransfer.getData(MIME));
     if (!plan || plan.column_id === columnId) return;
     setError(null);
-    const from = plan.column_id;
-    movePlan.mutate({ plan, columnId }, {
-      onSuccess: () => warnIfForward(plan, from, columnId),
-      onError: (err) => setError((err as Error).message),
-    });
+    if (!(await askMove(plan, columnId))) return; // recusou: o card permanece na coluna
+    movePlan.mutate({ plan, columnId }, { onError: (err) => setError((err as Error).message) });
   };
 
   const chip = (active: boolean) =>
@@ -199,23 +193,33 @@ export function PlansView() {
         })}
       </div>
 
-      {warning && (
-        <div role="alert"
-             className="fixed inset-x-4 bottom-4 z-[60] mx-auto flex max-w-md items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 shadow-lg">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1">{warning.text}</span>
-          <button onClick={warning.undo} className="shrink-0 rounded-lg border border-amber-400 bg-white px-2 py-1 text-xs font-medium hover:bg-amber-100">
-            Desfazer
-          </button>
-          <button onClick={() => setWarning(null)} aria-label="Fechar aviso" className="shrink-0"><X className="h-4 w-4" /></button>
-        </div>
-      )}
+      <Modal open={!!question} onClose={() => answer(false)} title="Etapas pendentes">
+        {question && (
+          <div className="space-y-4">
+            <p className="flex items-start gap-2 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <span>
+                “{question.plan.title}” ainda tem <b>{question.pending} de {question.total}</b> etapas pendentes.
+                Deseja mesmo movê-lo para “{question.toName}”?
+              </span>
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => answer(false)} className="rounded-lg px-4 py-2 text-sm hover:bg-slate-100">
+                Não, manter na coluna
+              </button>
+              <button onClick={() => answer(true)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+                Sim, mover
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <PlanDialog
         open={dialog.open}
         plan={dialogPlan}
         onClose={() => setDialog((d) => ({ ...d, open: false }))}
-        onColumnChanged={warnIfForward}
+        confirmMove={askMove}
       />
       <PlanColumnsDialog open={columnsOpen} onClose={() => setColumnsOpen(false)} />
     </div>

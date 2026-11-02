@@ -13,8 +13,8 @@ interface Props {
   open: boolean;
   plan: Plan | null; // null = criar
   onClose: () => void;
-  /** Chamado depois de salvar quando a coluna do plano mudou (para avisar sobre etapas pendentes). */
-  onColumnChanged?: (plan: Plan, fromColumnId: string, toColumnId: string) => void;
+  /** Pergunta antes de mover para a coluna (ex.: etapas pendentes). Resolve false se o usuário recusar. */
+  confirmMove?: (plan: Plan, toColumnId: string) => Promise<boolean>;
 }
 
 const emptyForm = (columnId: string): PlanInput => ({
@@ -22,7 +22,7 @@ const emptyForm = (columnId: string): PlanInput => ({
 });
 
 /** Criar/editar plano. Ao editar, também gerencia as etapas (checklist). */
-export function PlanDialog({ open, plan, onClose, onColumnChanged }: Props) {
+export function PlanDialog({ open, plan, onClose, confirmMove }: Props) {
   const { memberById } = useHousehold();
   const { items, columns, createPlan, updatePlan, deletePlan, addItem, toggleItem, deleteItem } = useRealtimePlans();
   const [form, setForm] = useState<PlanInput>(emptyForm(''));
@@ -59,10 +59,12 @@ export function PlanDialog({ open, plan, onClose, onColumnChanged }: Props) {
         (Object.keys(payload) as (keyof PlanInput)[]).forEach((k) => {
           if (k !== 'is_personal' && payload[k] !== plan[k]) (patch as Record<string, unknown>)[k] = payload[k];
         });
-        if (Object.keys(patch).length > 0) {
-          await updatePlan.mutateAsync({ plan, patch });
-          if (patch.column_id) onColumnChanged?.(plan, plan.column_id, patch.column_id);
+        if (patch.column_id && confirmMove && !(await confirmMove(plan, patch.column_id))) {
+          // recusou: nada é salvo e a coluna volta ao valor original
+          set('column_id', plan.column_id);
+          return;
         }
+        if (Object.keys(patch).length > 0) await updatePlan.mutateAsync({ plan, patch });
       } else {
         await createPlan.mutateAsync(payload);
       }
